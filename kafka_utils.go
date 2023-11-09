@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
@@ -14,7 +16,7 @@ const (
 
 var (
 	config = kafka.ConfigMap{
-		"bootstrap.servers": kafka.ConfigValue("localhost"),
+		"bootstrap.servers": kafka.ConfigValue(os.Getenv("BOOTSTRAP_SERVERS")),
 	}
 )
 
@@ -33,7 +35,7 @@ func SetupConsumerGroupLagInTopic(ctx context.Context) {
 	}
 
 	fmt.Println("Creating consumer group for skewed topic")
-	if err := CreateConsumerGroup(SKEWED_TOPIC_NAME, SKEWED_CONSUMER_GROUP_ID); err != nil {
+	if err := CreateConsumerGroup(SKEWED_TOPIC_NAME, SKEWED_CONSUMER_GROUP_ID, 3); err != nil {
 		panic(err)
 	}
 }
@@ -88,11 +90,12 @@ func ProduceSkewedMessagesToTopic(topic string, numMessages int, numPartitions i
 				Topic:     &topic,
 				Partition: partitionNum,
 			},
-			Value: []byte(string(msg)),
+			Value:     []byte(string(msg)),
+			Timestamp: time.Now(),
 		}, nil)
 	}
-	producer.Flush(15 * 1000)
 
+	producer.Flush(10 * 1000)
 	fmt.Println("Messages produced")
 	return nil
 }
@@ -100,7 +103,7 @@ func ProduceSkewedMessagesToTopic(topic string, numMessages int, numPartitions i
 /*
 Reads one message off the topic to initiate the consumer group
 */
-func CreateConsumerGroup(topic string, consumerGroupName string) error {
+func CreateConsumerGroup(topic string, consumerGroupName string, numPartitions int) error {
 	config.SetKey("group.id", consumerGroupName)
 	config.SetKey("auto.offset.reset", "earliest")
 
@@ -109,11 +112,14 @@ func CreateConsumerGroup(topic string, consumerGroupName string) error {
 		return err
 	}
 	defer consumer.Close()
-
 	consumer.Subscribe(topic, nil)
-	event := consumer.Poll(1000 * 5)
-	fmt.Println(fmt.Sprintf("Event: %v, err: %v", event, err))
 
+	readPartitionsBitMap := map[int32]bool{}
+	for len(readPartitionsBitMap) != numPartitions {
+		message, _ := consumer.ReadMessage(10 * time.Second)
+		fmt.Printf("Read message from partition: %v, message: %v\n", message.TopicPartition.Partition, message.Value)
+		readPartitionsBitMap[message.TopicPartition.Partition] = true
+	}
 	consumer.Commit()
 	return nil
 }

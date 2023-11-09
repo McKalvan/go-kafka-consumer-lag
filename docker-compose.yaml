@@ -21,7 +21,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:19092,PLAINTEXT_INTERNAL://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
   
   kafka2:
     image: confluentinc/cp-kafka:6.2.12
@@ -35,7 +35,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:29092,PLAINTEXT_INTERNAL://localhost:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
   
   kafka3:
     image: confluentinc/cp-kafka:6.2.12
@@ -49,7 +49,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:39092,PLAINTEXT_INTERNAL://localhost:9094
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   burrow:
     image: "coco/burrow"
@@ -73,8 +73,15 @@ services:
     depends_on:
       - "burrow"
     environment:
-      BURROW_ADDR: "http://localhost:8000"
+      BURROW_ADDR: "http://burrow:8000"
       METRICS_ADDR: "0.0.0.0:8080"
       INTERVAL: "30"
       API_VERSION: "3"
     restart: always
+
+  kafka-consumer-lag-go:
+    image: kafka-consumer-lag-go
+    depends_on:
+      - "burrow-exporter"
+    environment:
+      BOOTSTRAP_SERVERS: "kafka1:19092,kafka2:29092,kafka3:39092"
